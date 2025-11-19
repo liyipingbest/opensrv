@@ -23,6 +23,16 @@ use tokio::io::AsyncWrite;
 
 use opensrv_mysql::*;
 use tokio::net::TcpListener;
+use opensrv_mysql::Column;
+use opensrv_mysql::ColumnType;
+use opensrv_mysql::ColumnFlags;
+// use opensrv_mysql::CharacterSet;
+// use opensrv_mysql::OkResponse;
+// use opensrv_mysql::AsyncMysqlShim;
+use opensrv_mysql::AsyncMysqlIntermediary;
+// use opensrv_mysql::StatementMetaWriter;
+// use opensrv_mysql::QueryResultWriter;
+// use opensrv_mysql::InitWriter;
 
 struct Backend;
 
@@ -30,22 +40,90 @@ struct Backend;
 impl<W: AsyncWrite + Send + Unpin> AsyncMysqlShim<W> for Backend {
     type Error = io::Error;
 
+
+     /// Called when client switches database.
+    async fn on_init<'a>(
+        &'a mut self,
+        database: &'a str,
+        _: InitWriter<'a, W>,
+    ) -> Result<(), Self::Error> {
+        print!("Init db, database:{}\n", database);
+        Ok(())
+    }
+
     async fn on_prepare<'a>(
         &'a mut self,
-        _: &'a str,
+        pre_sql: &'a str,
         info: StatementMetaWriter<'a, W>,
     ) -> io::Result<()> {
-        info.reply(42, &[], &[]).await
+        println!("prepare sql {:?}", pre_sql);
+
+        let param = Column {
+            table: "foo".to_string(),
+            column: "a".to_string(),
+            collen: 2,
+            coltype: ColumnType::MYSQL_TYPE_TINY,
+            colflags: ColumnFlags::empty(),
+        };
+
+        let cols = [
+            Column {
+                table: "foo".to_string(),
+                column: "a".to_string(),
+                collen: 4,
+                coltype: ColumnType::MYSQL_TYPE_LONGLONG,
+                colflags: ColumnFlags::empty(),
+            },
+            Column {
+                table: "foo".to_string(),
+                column: "b".to_string(),
+                collen: 4,
+                coltype: ColumnType::MYSQL_TYPE_STRING,
+                colflags: ColumnFlags::empty(),
+            },
+        ];
+        info.reply(42, &[param.clone(),param], &cols).await
     }
 
     async fn on_execute<'a>(
         &'a mut self,
-        _: u32,
-        _: opensrv_mysql::ParamParser<'a>,
+        session_id: u32,
+        param_parser: opensrv_mysql::ParamParser<'a>,
         results: QueryResultWriter<'a, W>,
     ) -> io::Result<()> {
+        println!("execute with session_id:{} ", session_id);
+        for (i, param) in param_parser.into_iter().enumerate() {
+            // ParamValue no longer exposes Value/Null variants directly; print the param for now.
+           // println!("  param[{}] = {:?}", i, param.value());
+        }
+
+        // let cols = [
+        //     Column {
+        //         table: "foo".to_string(),
+        //         column: "a".to_string(),
+        //         collen: 4,
+        //         coltype: ColumnType::MYSQL_TYPE_LONGLONG,
+        //         colflags: ColumnFlags::empty(),
+        //     },
+        //     Column {
+        //         table: "foo".to_string(),
+        //         column: "b".to_string(),
+        //         collen: 4,
+        //         coltype: ColumnType::MYSQL_TYPE_STRING,
+        //         colflags: ColumnFlags::empty(),
+        //     },
+        // ];
+        // let mut rw = results.start(&cols).await?;
+        //
+        // rw.write_col(55)?;
+        // rw.write_col("execute result")?;
+        //
+        //
+        // rw.finish().await;
+        
         results.completed(OkResponse::default()).await
     }
+
 
     async fn on_close(&mut self, _: u32) {}
 
@@ -54,8 +132,42 @@ impl<W: AsyncWrite + Send + Unpin> AsyncMysqlShim<W> for Backend {
         sql: &'a str,
         results: QueryResultWriter<'a, W>,
     ) -> io::Result<()> {
-        println!("execute sql {:?}", sql);
-        results.start(&[]).await?.finish().await
+        println!("query sql {:?}", sql);
+        let cols = [
+            // Column {
+            //     table: "foo".to_string(),
+            //     column: "a".to_string(),
+            //     collen: 4,
+            //     coltype: ColumnType::MYSQL_TYPE_LONGLONG,
+            //     colflags: ColumnFlags::empty(),
+            // },
+            // Column {
+            //     table: "foo".to_string(),
+            //     column: "b".to_string(),
+            //     collen: 8,
+            //     coltype: ColumnType::MYSQL_TYPE_STRING,
+            //     colflags: ColumnFlags::empty(),
+            // },
+        ];
+        let mut rw = results.start(&cols).await?;
+
+        // rw.write_col(42)?;
+        // rw.write_col("b's value")?;
+
+
+        rw.finish().await
+    }
+
+    /// authenticate method for the specified plugin
+    async fn authenticate(
+        &self,
+        _auth_plugin: &str,
+        username: &[u8],
+        _salt: &[u8],
+        _auth_data: &[u8],
+    ) -> bool {
+        println!("authenticating user {:?}", String::from_utf8_lossy(username));
+        username == "test".as_bytes()
     }
 }
 
