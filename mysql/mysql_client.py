@@ -22,7 +22,7 @@ def main():
             # 准备SQL语句
             query = "SELECT * FROM users WHERE age > ? AND city = ?"
             # 执行参数化查询
-            params = (25, 'Beijing')
+            params = (25, 'Beijing1234')
             cursor.execute(query, params)
 
             # 获取结果
