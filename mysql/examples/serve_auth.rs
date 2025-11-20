@@ -83,7 +83,8 @@ impl<W: AsyncWrite + Send + Unpin> AsyncMysqlShim<W> for Backend {
         _salt: &[u8],
         _auth_data: &[u8],
     ) -> bool {
-        username == "default".as_bytes()
+        println!("authenticating user {:?}", String::from_utf8_lossy(username));
+        username == "test".as_bytes()
     }
 
     fn version(&self) -> String {
