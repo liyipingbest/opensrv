@@ -88,11 +88,55 @@ impl<W: AsyncWrite + Send + Unpin> AsyncMysqlShim<W> for Backend {
     async fn on_execute<'a>(
         &'a mut self,
         session_id: u32,
-        param_parser: opensrv_mysql::ParamParser<'a>,
+        param_parser:ParamParser<'a>,
         results: QueryResultWriter<'a, W>,
     ) -> io::Result<()> {
         println!("execute with session_id:{} ", session_id);
         for (i, param) in param_parser.into_iter().enumerate() {
+            let value = param.value;
+            println!("param type {:?}", param.coltype);
+            match param.coltype {
+                ColumnType::MYSQL_TYPE_DECIMAL => {}
+                ColumnType::MYSQL_TYPE_TINY => {}
+                ColumnType::MYSQL_TYPE_SHORT => {}
+                ColumnType::MYSQL_TYPE_LONG => {}
+                ColumnType::MYSQL_TYPE_FLOAT => {}
+                ColumnType::MYSQL_TYPE_DOUBLE => {}
+                ColumnType::MYSQL_TYPE_NULL => {}
+                ColumnType::MYSQL_TYPE_TIMESTAMP => {}
+                ColumnType::MYSQL_TYPE_LONGLONG => {
+                    let param:i64 = value.into();
+                    println!("param {}, value:{:?}", i, param);
+                }
+                ColumnType::MYSQL_TYPE_INT24 => {}
+                ColumnType::MYSQL_TYPE_DATE => {}
+                ColumnType::MYSQL_TYPE_TIME => {}
+                ColumnType::MYSQL_TYPE_DATETIME => {}
+                ColumnType::MYSQL_TYPE_YEAR => {}
+                ColumnType::MYSQL_TYPE_NEWDATE => {}
+                ColumnType::MYSQL_TYPE_VARCHAR => {}
+                ColumnType::MYSQL_TYPE_BIT => {}
+                ColumnType::MYSQL_TYPE_TIMESTAMP2 => {}
+                ColumnType::MYSQL_TYPE_DATETIME2 => {}
+                ColumnType::MYSQL_TYPE_TIME2 => {}
+                ColumnType::MYSQL_TYPE_TYPED_ARRAY => {}
+                ColumnType::MYSQL_TYPE_UNKNOWN => {}
+                ColumnType::MYSQL_TYPE_JSON => {}
+                ColumnType::MYSQL_TYPE_NEWDECIMAL => {}
+                ColumnType::MYSQL_TYPE_ENUM => {}
+                ColumnType::MYSQL_TYPE_SET => {}
+                ColumnType::MYSQL_TYPE_TINY_BLOB => {}
+                ColumnType::MYSQL_TYPE_MEDIUM_BLOB => {}
+                ColumnType::MYSQL_TYPE_LONG_BLOB => {}
+                ColumnType::MYSQL_TYPE_BLOB => {}
+                ColumnType::MYSQL_TYPE_VAR_STRING => {}
+                ColumnType::MYSQL_TYPE_STRING => {
+                    let param:&str = value.into();
+                    println!("param {}, value:{:?}", i, param);
+                }
+                ColumnType::MYSQL_TYPE_GEOMETRY => {}
+            }
+
             // ParamValue no longer exposes Value/Null variants directly; print the param for now.
            // println!("  param[{}] = {:?}", i, param.value());
         }
@@ -134,28 +178,36 @@ impl<W: AsyncWrite + Send + Unpin> AsyncMysqlShim<W> for Backend {
     ) -> io::Result<()> {
         println!("query sql {:?}", sql);
         let cols = [
-            // Column {
-            //     table: "foo".to_string(),
-            //     column: "a".to_string(),
-            //     collen: 4,
-            //     coltype: ColumnType::MYSQL_TYPE_LONGLONG,
-            //     colflags: ColumnFlags::empty(),
-            // },
-            // Column {
-            //     table: "foo".to_string(),
-            //     column: "b".to_string(),
-            //     collen: 8,
-            //     coltype: ColumnType::MYSQL_TYPE_STRING,
-            //     colflags: ColumnFlags::empty(),
-            // },
+            Column {
+                table: "foo".to_string(),
+                column: "a".to_string(),
+                collen: 4,
+                coltype: ColumnType::MYSQL_TYPE_LONGLONG,
+                colflags: ColumnFlags::empty(),
+            },
+            Column {
+                table: "foo".to_string(),
+                column: "b".to_string(),
+                collen: 8,
+                coltype: ColumnType::MYSQL_TYPE_STRING,
+                colflags: ColumnFlags::empty(),
+            },
         ];
-        let mut rw = results.start(&cols).await?;
 
-        // rw.write_col(42)?;
-        // rw.write_col("b's value")?;
+        if sql.to_lowercase().starts_with("select"){
+            let mut rw = results.start(&cols).await?;
+            rw.write_col(42)?;
+            rw.write_col("b's value")?;
+            rw.end_row().await?;
+            rw.write_col(43)?;
+            rw.write_col("c's value")?;
+            rw.finish().await
 
+        }else {
+            let rw = results.start(&[]).await?;
+            rw.finish().await
+        }
 
-        rw.finish().await
     }
 
     /// authenticate method for the specified plugin
